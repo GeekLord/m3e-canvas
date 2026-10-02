@@ -42,6 +42,8 @@ import {
   frameRect,
   frameRadius,
   carryItemSize,
+  baseRadii,
+  migrateSheetBox,
   connectSpecOf,
   canJoin,
   iconSlotsOf,
@@ -50,6 +52,24 @@ import {
   defaultPlatformOf,
   isPlatform,
   makeItem,
+  cardDefaultFillOf,
+  cardFillOf,
+  cardContentAlignOf,
+  cardImageMaxOf,
+  cardScrimOf,
+  cardTextColorOf,
+  isCardAlign,
+  isTextToken,
+  cardImagePosOf,
+  cardImageSizeOf,
+  CARD_IMAGE_MIN,
+  sizeOf,
+  isCardImagePos,
+  paletteOf,
+  DEFAULT_THEME,
+  CARD_MEDIA_GAP,
+  CARD_PADDING,
+  CARD_SIDE_IMAGE_W,
   Frame,
   Item,
   NavTab,
@@ -337,5 +357,109 @@ describe("makeItem", () => {
     expect(box.radiusTop).toBe(28);
     expect(box.radiusBottom).toBe(28);
   });
+
+  it("a box is no longer made with a handle state", () => {
+    expect(makeItem("box").checked).toBeUndefined();
+  });
+
+  it("a bottom sheet starts 320dp tall on surfaceContainerLow, rounded only at the top", () => {
+    const sheet = makeItem("bottomSheet");
+    expect(sheet.size2).toBe(320);
+    expect(sheet.fill).toBe("surfaceContainerLow");
+    expect(sheet.radiusTop).toBe(28);
+    expect(sheet.radiusBottom).toBeUndefined();
+    expect(baseRadii({ ...sheet, radiusTop: 12 })).toEqual({ tl: 12, tr: 12, bl: 0, br: 0 });
+  });
+
+  it("a box saved with its handle on is read back as a bottom sheet", () => {
+    const old: Item = { id: "1", kind: "box", label: "", icon: null, variant: "filled", checked: true, size2: 300, radiusTop: 20, radiusBottom: 20, fill: "surfaceContainerHigh" };
+    const out = migrateSheetBox(old);
+    expect(out.kind).toBe("bottomSheet");
+    expect(out.checked).toBeUndefined();
+    expect(out.radiusBottom).toBeUndefined();
+    expect(out.radiusTop).toBe(20);
+    expect(out.size2).toBe(300);
+    expect(out.fill).toBe("surfaceContainerHigh");
+    const plain = { ...old, checked: false };
+    expect(migrateSheetBox(plain)).toBe(plain);
+  });
+});
+
+describe("card image placement helpers", () => {
+  it("uses each variant's M3 palette role until the author overrides it", () => {
+    expect(cardDefaultFillOf("tonal")).toBe("surfaceContainerHighest");
+    expect(cardDefaultFillOf("elevated")).toBe("surfaceContainerLow");
+    expect(cardDefaultFillOf("outlined")).toBe("surface");
+    expect(cardFillOf({ ...makeItem("card"), variant: "elevated" })).toBe("surfaceContainerLow");
+    expect(cardFillOf({ ...makeItem("card"), variant: "outlined", fill: "primaryContainer" })).toBe("primaryContainer");
+  });
+
+  it("accepts exactly the four placements", () => {
+    for (const pos of ["top", "bottom", "leading", "trailing", "background"]) expect(isCardImagePos(pos)).toBe(true);
+    for (const bad of [undefined, null, "middle", "left", 3]) expect(isCardImagePos(bad)).toBe(false);
+  });
+
+  it("keeps sketches saved before placement existed on top", () => {
+    expect(cardImagePosOf(makeItem("card"))).toBe("top");
+    expect(cardImagePosOf({ ...makeItem("card"), imagePos: "background" })).toBe("background");
+  });
+
+  it("defaults the top image to 28% of the card's width and a side column to the standard width", () => {
+    const card = makeItem("card");
+    expect(cardImageSizeOf(card)).toBe(Math.round(CONTENT_W * 0.28));
+    // a narrow unsized card is short too, so its default band is clamped to what fits
+    expect(cardImageSizeOf({ ...card, size: 200 })).toBe(Math.min(Math.round(200 * 0.28), cardImageMaxOf({ ...card, size: 200 })));
+    expect(cardImageSizeOf({ ...card, imagePos: "leading" })).toBe(CARD_SIDE_IMAGE_W);
+    expect(cardImageSizeOf({ ...card, imagePos: "trailing" })).toBe(CARD_SIDE_IMAGE_W);
+  });
+
+  it("keeps a size the author set, whatever the placement", () => {
+    const card = { ...makeItem("card"), imageSize: 120 };
+    expect(cardImageSizeOf(card)).toBe(120);
+    expect(cardImageSizeOf({ ...card, imagePos: "leading" })).toBe(120);
+  });
+
+  it("never lets an image push the text out of the card", () => {
+    const card = { ...makeItem("card"), imageSize: 320 };
+    // the bound follows the drawn height, which an unsized card takes from its width
+    const drawnH = sizeOf(card, {}).h;
+    expect(cardImageSizeOf(card)).toBe(cardImageMaxOf(card));
+    expect(cardImageMaxOf(card)).toBe(drawnH - CARD_PADDING * 2 - CARD_MEDIA_GAP - 48);
+    expect(cardImageSizeOf({ ...card, size2: 420 })).toBe(320);
+    // a side column is bounded by the card's width, leaving a readable text column
+    const drawnW = sizeOf(card, {}).w;
+    expect(cardImageSizeOf({ ...card, imagePos: "leading" })).toBe(drawnW - CARD_PADDING * 2 - CARD_MEDIA_GAP - 96);
+    expect(cardImageSizeOf({ ...card, imagePos: "trailing", imageSize: 80 })).toBe(80);
+    // the smallest card still reports the floor rather than a negative bound
+    expect(cardImageMaxOf({ ...card, size: 160, size2: 96 })).toBe(CARD_IMAGE_MIN);
+  });
+
+  it("puts the text at the top, or at the bottom over a background image, until told otherwise", () => {
+    expect(cardContentAlignOf(makeItem("card"))).toBe("start");
+    expect(cardContentAlignOf({ ...makeItem("card"), imagePos: "background" })).toBe("end");
+    expect(cardContentAlignOf({ ...makeItem("card"), imagePos: "background", noImage: true })).toBe("start");
+    expect(cardContentAlignOf({ ...makeItem("card"), contentAlign: "center" })).toBe("center");
+    for (const align of ["start", "center", "end"]) expect(isCardAlign(align)).toBe(true);
+    for (const bad of ["left", "top", "", null]) expect(isCardAlign(bad)).toBe(false);
+  });
+
+  it("colors the text from its role, else from where it sits", () => {
+    const p = paletteOf("purple", undefined, DEFAULT_THEME);
+    const card = makeItem("card");
+    expect(cardTextColorOf(card, p)).toBe(p.onSurface);
+    expect(cardTextColorOf({ ...card, fill: "primary" }, p)).toBe(p.onPrimary);
+    expect(cardTextColorOf({ ...card, imagePos: "background" }, p)).toBe(p.onPrimaryContainer);
+    expect(cardTextColorOf({ ...card, imagePos: "background", src: "data:x" }, p)).toBe("#ffffff");
+    expect(cardTextColorOf({ ...card, imagePos: "background", src: "data:x", textColor: "primary" }, p)).toBe(p.primary);
+    expect(isTextToken("primary")).toBe(true);
+    expect(isTextToken("surface")).toBe(false);
+  });
+
+  it("fades a dark scrim under light text and a light one under dark text, from the text's side", () => {
+    expect(cardScrimOf("#ffffff", "end")).toMatch(/^linear-gradient\(rgba\(0,0,0,0\) 40%/);
+    expect(cardScrimOf("#1a1a1a", "start")).toMatch(/^linear-gradient\(rgba\(255,255,255,0\.72\)/);
+    expect(cardScrimOf("#ffffff", "center")).toMatch(/^rgba\(0,0,0,/);
+  });
+
 });
 

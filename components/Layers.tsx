@@ -4,6 +4,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { Reorder, useDragControls } from "motion/react";
 import { Frame, Group, Item, KIND_SPEC, Palette, explodeGroup, isPhoneFrame } from "@/lib/tokens";
 import { Icon } from "./M3Node";
+import { Select } from "./ui";
 import { Lang, KIND_TEXT, t, useLang } from "@/lib/i18n";
 
 /* Rows never animate their size: opening a row only adds rows under it, so
@@ -37,6 +38,8 @@ function Row({
   onSelect,
   open,
   onToggle,
+  locked,
+  onLock,
   onDragging,
   children,
 }: {
@@ -50,6 +53,10 @@ function Row({
   /** set when the row can open to show what it holds */
   open?: boolean;
   onToggle?: () => void;
+  /** the group's lock, so the row shows which state it is in */
+  locked?: boolean;
+  /** flips the group's lock; set only on a whole group's row */
+  onLock?: () => void;
   onDragging: (dragging: boolean) => void;
   children?: ReactNode;
 }) {
@@ -101,6 +108,18 @@ function Row({
           <span style={{ display: "inline-flex", gap: 2, color: on ? p.onSecondaryContainer : p.primary }}>{icon}</span>
           <span style={{ fontSize: 12, fontWeight: depth === 0 ? 600 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
         </button>
+        {onLock && (
+          <button
+            onClick={onLock}
+            title={t(locked ? "unlock" : "lock", lang)}
+            aria-label={t(locked ? "unlock" : "lock", lang)}
+            aria-pressed={!!locked}
+            className="m3-press"
+            style={{ width: 28, height: 28, borderRadius: 14, border: "none", background: "transparent", color: locked ? (on ? p.onSecondaryContainer : p.primary) : p.outline, cursor: "pointer", padding: 0, display: "grid", placeItems: "center", flex: "0 0 auto" }}
+          >
+            <Icon name={locked ? "lock" : "lock_open"} size={20} fill={locked} />
+          </button>
+        )}
         {onToggle && (
           <button
             onClick={onToggle}
@@ -182,6 +201,7 @@ export function LayersPanel({
   selectedIds,
   onSelect,
   onReorder,
+  onToggleLock,
   onReorderItems,
   onDragging,
 }: {
@@ -197,6 +217,8 @@ export function LayersPanel({
   onSelect: (itemIds: string[], add: boolean) => void;
   /** new order, top layer first */
   onReorder: (topFirst: string[]) => void;
+  /** flips a group's lock from its row's lock icon */
+  onToggleLock: (groupId: string) => void;
   /** a group's parts in a new order: back to front for a free group, reading order for a run */
   onReorderItems: (groupId: string, ids: string[]) => void;
   /** a drag on any level starting or ending, so the page can record one undo step for the whole drag */
@@ -272,36 +294,15 @@ export function LayersPanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {frames.length > 1 && (
-        <div className="no-scrollbar" style={{ display: "flex", gap: 6, padding: "12px 12px 4px", overflowX: "auto", flex: "0 0 auto" }}>
-          {frames.map((f) => {
-            const on = f.id === frameId;
-            return (
-              <button
-                key={f.id}
-                onClick={() => onFrame(f.id)}
-                className="m3-press"
-                style={{
-                  height: 32,
-                  padding: "0 12px 0 8px",
-                  borderRadius: 16,
-                  border: "none",
-                  background: on ? p.primary : p.surfaceContainerHigh,
-                  color: on ? p.onPrimary : p.onSurfaceVariant,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  whiteSpace: "nowrap",
-                  flex: "0 0 auto",
-                }}
-              >
-                <Icon name={isPhoneFrame(f) ? "smartphone" : "desktop_windows"} size={16} />
-                {f.name || t("screen", lang)}
-              </button>
-            );
-          })}
+        /* the screen whose layers are listed, picked from a dropdown the way a tap's target is */
+        <div style={{ padding: "12px 12px 4px", flex: "0 0 auto" }}>
+          <Select
+            options={frames.map((f) => ({ key: f.id, label: f.name || t("screen", lang), icon: isPhoneFrame(f) ? "smartphone" : "desktop_windows" }))}
+            value={frameId && frames.some((f) => f.id === frameId) ? frameId : frames[0].id}
+            onChange={onFrame}
+            p={p}
+            label={t("screens", lang)}
+          />
         </div>
       )}
       <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "8px 10px 12px" }}>
@@ -327,6 +328,8 @@ export function LayersPanel({
                   onSelect={(add) => onSelect(g.items.map((it) => it.id), add)}
                   open={canOpen ? open : undefined}
                   onToggle={canOpen ? () => toggle(g.id) : undefined}
+                  locked={g.locked}
+                  onLock={() => onToggleLock(g.id)}
                   onDragging={onDragging}
                 >
                   {groupBody(g, 1)}
