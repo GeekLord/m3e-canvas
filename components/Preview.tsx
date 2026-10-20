@@ -11,6 +11,7 @@ import {
   LINK_TARGET,
   MENU_TARGET,
   fabOpen,
+  fabTypePatch,
   hasMenu,
   menuOpen as fabMenuOpen,
   linkUrlOf,
@@ -80,6 +81,8 @@ const EASE = [0.2, 0, 0, 1] as const;
 const SLIDE_MS = 0.42;
 /** room reserved for the wide preview controls: panel, right margin and breathing space */
 const WIDE_CONTROL_SPACE = 220;
+/** quiet time after the last scroll event before a folding FAB grows its label back */
+const FAB_SCROLL_IDLE_MS = 180;
 
 type Anim = { t: Transition; back: boolean; /** the expressive motion scheme: springs instead of eased tweens */ spring?: boolean };
 
@@ -204,6 +207,7 @@ function Tappable({
   onRailToggle,
   railAnimating,
   panY,
+  easeWidth,
 }: {
   item: Item;
   p: Palette;
@@ -223,6 +227,8 @@ function Tappable({
   railAnimating?: boolean;
   /** the part rides on a body that scrolls: a drag up or down on it is the body's */
   panY?: boolean;
+  /** this preview part is allowed to animate between measured and fixed widths */
+  easeWidth?: boolean;
 }) {
   const lang = useLang();
   const [pressed, setPressed] = useState(false);
@@ -581,7 +587,7 @@ function Tappable({
       onClick={onPick ? () => onMenu?.(!menu) : onTap}
       style={{ cursor: live || onValue ? "pointer" : "default", display: "flex", position: "relative", touchAction: scrollRow ? (panY ? "pan-x pan-y" : "pan-x") : panY ? "pan-y" : "none" }}
     >
-      <M3Node item={item} palette={p} widths={widths} radii={radii} interactive={false} pressed={pressed && !onValue && !boxless} tabScroll={scrollRow ? tabScroll : undefined} />
+      <M3Node item={item} palette={p} widths={widths} radii={radii} interactive={false} pressed={pressed && !onValue && !boxless} tabScroll={scrollRow ? tabScroll : undefined} easeWidth={easeWidth} />
       {live && !boxless && !segmented && TAP_LIT.includes(item.kind) && (
         <div
           aria-hidden
@@ -762,6 +768,9 @@ function Screen({
 }) {
   /* the dropdown whose menu is open, if any; its group is lifted above the rest */
   const [menuId, setMenuId] = useState<string | null>(null);
+  /* a folding FAB stays compact for the whole gesture, including momentum in either direction */
+  const [fabFolded, setFabFolded] = useState(false);
+  const fabScrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [railStates, setRailStates] = useState<Record<string, boolean>>({});
   const [railMotion, setRailMotion] = useState<(ReturnType<typeof railMotionTargets> & { animate: boolean }) | null>(null);
   const lang = useLang();
@@ -791,6 +800,19 @@ function Screen({
     }
   }
   const lift = (g: Group) => pins.get(g.id) ?? 0;
+  const hasFoldingFab = shownGroups.some((g) => g.items.some((it) => it.kind === "extendedFab" && it.collapseOnScroll));
+  const onBodyScroll = () => {
+    if (!hasFoldingFab) return;
+    setFabFolded(true);
+    if (fabScrollIdle.current !== null) clearTimeout(fabScrollIdle.current);
+    fabScrollIdle.current = setTimeout(() => {
+      fabScrollIdle.current = null;
+      setFabFolded(false);
+    }, FAB_SCROLL_IDLE_MS);
+  };
+  useEffect(() => () => {
+    if (fabScrollIdle.current !== null) clearTimeout(fabScrollIdle.current);
+  }, []);
   const hasModal = modalIds.size > 0;
   const modalActive = interactive && hasModal;
   const changeRail = (id: string, railExpanded: boolean, animate: boolean) => {
@@ -885,6 +907,7 @@ function Screen({
         <div
           data-scroll-body
           className="m3-hidden-scrollbar"
+          onScroll={onBodyScroll}
           style={{ position: "absolute", inset: 0, overflowX: "hidden", overflowY: "auto", overscrollBehavior: "contain", touchAction: "pan-y" }}
         >
           <div style={{ position: "relative", height: length }}>{nodes.filter((_, i) => !pins.has(shownGroups[i].id))}</div>
@@ -957,7 +980,7 @@ function Screen({
           {((corners) => g.items.map((it, i) => {
             const conn = connectSpecOf(it);
             const n = g.free ? 1 : g.items.length;
-            const radii = g.free
+            let radii = g.free
               ? (corners?.get(it.id) ?? baseRadii(it))
               : conn && n > 1
                 ? g.axis === "x"
@@ -989,6 +1012,14 @@ function Screen({
             if (navKind && values[navKey] !== undefined && values[navKey] >= 0) shown = { ...shown, selected: values[navKey] };
             /* a row whose selection the author never set shows the destination the visitor tapped to open this screen */
             else if (navKind && it.selected === undefined && values[`${navKey}:opened:${frame.id}`] !== undefined) shown = { ...shown, selected: values[`${navKey}:opened:${frame.id}`] };
+            /* a label-bearing FAB folds for motion in either direction and only unfolds after
+             * the body settles, whether the FAB rides the body or stands put with a bar */
+            const foldable = scrolls && it.kind === "extendedFab" && !!it.collapseOnScroll;
+            const folded = foldable && fabFolded && !fabMenuOpen(shown);
+            if (folded) {
+              shown = { ...shown, ...fabTypePatch(shown, "fab") };
+              if (g.free) radii = baseRadii(shown);
+            }
             const tap =
               act || flips(it)
                 ? () => {
@@ -1041,13 +1072,26 @@ function Screen({
                 onMenu={it.kind === "select" ? (open) => setMenuId(open ? it.id : null) : undefined}
                 onRailToggle={it.kind === "navRail" && isWideRail(it) ? (animate) => changeRail(it.id, !it.railExpanded, animate) : undefined}
                 panY={scrolls && !pins.has(g.id)}
+                easeWidth={foldable}
               />
             );
-            if (!g.free) return node;
+            /* Keep the authored width as a right-aligned slot. The visual can then narrow from
+             * its left edge while its right edge stays exactly where the author placed it. */
+            const anchored = foldable
+              ? (
+                  <div
+                    key={it.id}
+                    style={{ width: sizeOf(it, widths).w, display: "flex", justifyContent: "flex-end", flex: "0 0 auto" }}
+                  >
+                    {node}
+                  </div>
+                )
+              : node;
+            if (!g.free) return anchored;
             const o = g.pos?.[it.id] ?? { x: 0, y: 0 };
             return (
               <div key={it.id} style={{ position: "absolute", left: o.x, top: o.y }}>
-                {node}
+                {anchored}
               </div>
             );
           }))(g.free ? freeRadii(g, widths) : null)}
