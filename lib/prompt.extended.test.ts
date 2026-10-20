@@ -204,12 +204,17 @@ describe("extended FAB scroll-collapse prompt", () => {
 
   it.each(["ja", "en", "zh", "ko"] as Lang[])("describes the enabled scroll transform in %s", (lang) => {
     const fab: Item = { ...makeItem("extendedFab"), id: "fab", label: "Add", icon: "add", collapseOnScroll: true };
-    expect(buildPrompt(baseDoc({ groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).toContain(BEHAVIOR[lang]);
+    expect(buildPrompt(baseDoc({ frames: [{ ...phoneFrame, length: PHONE_H * 2 }], groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).toContain(BEHAVIOR[lang]);
+  });
+
+  it.each(["ja", "en", "zh", "ko"] as Lang[])("does not describe the transform when the screen does not scroll in %s", (lang) => {
+    const fab: Item = { ...makeItem("extendedFab"), id: "fab", label: "Add", icon: "add", collapseOnScroll: true };
+    expect(buildPrompt(baseDoc({ groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).not.toContain(BEHAVIOR[lang]);
   });
 
   it.each(["ja", "en", "zh", "ko"] as Lang[])("does not describe the transform when disabled in %s", (lang) => {
     const fab: Item = { ...makeItem("extendedFab"), id: "fab", label: "Add", icon: "add", collapseOnScroll: false };
-    expect(buildPrompt(baseDoc({ groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).not.toContain(BEHAVIOR[lang]);
+    expect(buildPrompt(baseDoc({ frames: [{ ...phoneFrame, length: PHONE_H * 2 }], groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).not.toContain(BEHAVIOR[lang]);
   });
 });
 

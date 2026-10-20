@@ -686,6 +686,15 @@ function boxCorners(it: Item, lang: Lang): string {
 
 const itemText = (it: Item, lang: Lang) => (lang === "ja" ? itemJa(it) : lang === "zh" ? itemZh(it) : lang === "ko" ? itemKo(it) : itemEn(it));
 
+/** A collapse-on-scroll FAB only has that behavior on a screen whose body actually scrolls. */
+function promptGroupsForScroll(groups: Group[], scrollable: boolean): Group[] {
+  if (scrollable) return groups;
+  return groups.map((g) => ({
+    ...g,
+    items: g.items.map((it) => it.collapseOnScroll ? { ...it, collapseOnScroll: undefined } : it),
+  }));
+}
+
 /* ================= connected runs ================= */
 
 function groupText(g: Group, lang: Lang): string {
@@ -1837,16 +1846,16 @@ export function buildPrompt(doc: Doc, widths: Record<string, number>, onlyFrameI
       lines.push(ph.screenHead(q(f.name || ph.screen), f.bg && f.bg !== "surface" ? f.bg : undefined, gs.length > 0, sizeLabel(f, viewport, lang)));
       if (gs.length > 0 && f.place && f.place !== "top") lines.push(ph.placement(f.place));
       if (gs.length > 0 && scrollsOf(f)) lines.push(ph.scrolls(frameLengthOf(f), frameSizeOf(f).h));
-      describeScreen(lines, gs, frameRect(f), widths, lang);
+      describeScreen(lines, promptGroupsForScroll(gs, scrollsOf(f)), frameRect(f), widths, lang);
     });
     if (loose.length && !only) {
       lines.push("");
       lines.push(ph.loose);
-      describeScreen(lines, loose, null, widths, lang);
+      describeScreen(lines, promptGroupsForScroll(loose, false), null, widths, lang);
     }
   } else {
     lines.push(ph.freeform);
-    describeScreen(lines, groups, null, widths, lang);
+    describeScreen(lines, promptGroupsForScroll(groups, false), null, widths, lang);
   }
 
   const behavior = [...groups.flatMap((g) => notes(g, allFrames, lang)), ...frames.flatMap((f) => swipeNotes(f, allFrames, lang))];
