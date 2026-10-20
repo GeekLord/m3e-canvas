@@ -1788,7 +1788,7 @@ export function extendedFabMetrics(h: number) {
 export function fabTypePatch(it: Item, to: FabKind): Partial<Item> {
   if (it.kind === to) return {};
   const base: Partial<Item> = { kind: to };
-  if (to === "fab") return { ...base, size: it.size2 ?? 56, size2: undefined };
+  if (to === "fab") return { ...base, size: it.size2 ?? 56, size2: undefined, collapseOnScroll: undefined };
   return { ...base, size: undefined, size2: Math.max(56, it.size ?? 56), label: it.label || KIND_SPEC.extendedFab.defLabel };
 }
 
