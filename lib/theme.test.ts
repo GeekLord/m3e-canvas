@@ -58,6 +58,18 @@ describe("font readiness during an in-flight stylesheet request", () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a loaded stylesheet when one of its weights fails to download", async () => {
+    load.mockImplementation(() => Promise.reject(new Error("network")));
+    const { ensureFontLoaded } = await import("./theme");
+    const ready = vi.fn();
+    ensureFontLoaded("robotoFlex", ready);
+    links[0].onload?.(); await flush();
+    expect(ready).toHaveBeenCalledTimes(1);
+    expect(links[0].remove).not.toHaveBeenCalled();
+    ensureFontLoaded("robotoFlex"); await flush();
+    expect(links).toHaveLength(1);
+  });
+
   it("does not request a stylesheet for the built-in face", async () => {
     const { ensureFontLoaded } = await import("./theme");
     const ready = vi.fn();

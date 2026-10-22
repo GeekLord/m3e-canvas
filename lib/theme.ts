@@ -31,7 +31,12 @@ function ensureFaceLoaded(google: string | undefined, family: string, onReady?: 
       link.onerror = failed;
       link.onload = () => {
         const face = family.split(",")[0].trim().replace(/^'|'$/g, "");
-        Promise.all([400, 500, 600, 700].map((w) => document.fonts.load(`${w} 16px "${face}"`))).then(() => resolve(), failed);
+        // A weight that fails to download leaves the stylesheet and the weights that did load in place.
+        try {
+          Promise.all([400, 500, 600, 700].map((w) => document.fonts.load(`${w} 16px "${face}"`))).then(() => resolve(), () => resolve());
+        } catch {
+          resolve(); // Without a usable FontFaceSet, waiting callers still remeasure.
+        }
       };
       document.head.appendChild(link);
     });
