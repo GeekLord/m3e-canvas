@@ -285,30 +285,27 @@ describe("a label-bearing FAB that folds while the screen scrolls", () => {
     vi.useRealTimers();
   });
 
-  it("keeps the label folded scrolling down or up, then restores it after the body settles", () => {
+  it("folds when the body scrolls down, stays folded at rest, and unfolds when it scrolls up", () => {
     const element = screenElement();
     let tree = treeOf(element, true);
-    expect(kinds(tree)).toEqual({ bar: "topAppBar", "bar-fab": "extendedFab", fab: "extendedFab", keep: "extendedFab", nav: "bottomNav" });
-    /* even the first small movement folds both a pinned and a body-riding FAB */
+    const extended = { bar: "topAppBar", "bar-fab": "extendedFab", fab: "extendedFab", keep: "extendedFab", nav: "bottomNav" };
+    const folded = { ...extended, "bar-fab": "fab", fab: "fab" };
+    expect(kinds(tree)).toEqual(extended);
+    /* even the first small movement down folds both a pinned and a body-riding FAB */
     scrollBody(tree, 1);
     tree = treeOf(element, false);
-    expect(kinds(tree)).toEqual({ bar: "topAppBar", "bar-fab": "fab", fab: "fab", keep: "extendedFab", nav: "bottomNav" });
-    vi.advanceTimersByTime(100);
-    scrollBody(tree, 24);
-    vi.advanceTimersByTime(100);
-    tree = treeOf(element, false);
-    expect(kinds(tree).fab).toBe("fab");
-    /* changing direction and reaching the top both keep restarting the settling clock */
-    scrollBody(tree, 12);
-    tree = treeOf(element, false);
-    expect(kinds(tree)).toEqual({ bar: "topAppBar", "bar-fab": "fab", fab: "fab", keep: "extendedFab", nav: "bottomNav" });
-    scrollBody(tree, 0);
-    vi.advanceTimersByTime(100);
-    tree = treeOf(element, false);
-    expect(kinds(tree).fab).toBe("fab");
+    expect(kinds(tree)).toEqual(folded);
+    scrollBody(tree, 240);
     vi.runAllTimers();
     tree = treeOf(element, false);
-    expect(kinds(tree)).toEqual({ bar: "topAppBar", "bar-fab": "extendedFab", fab: "extendedFab", keep: "extendedFab", nav: "bottomNav" });
+    expect(kinds(tree)).toEqual(folded);
+    /* any movement back up unfolds, without reaching the top */
+    scrollBody(tree, 200);
+    tree = treeOf(element, false);
+    expect(kinds(tree)).toEqual(extended);
+    scrollBody(tree, 220);
+    tree = treeOf(element, false);
+    expect(kinds(tree)).toEqual(folded);
   });
 
   it("keeps the button's right edge in a stable, right-aligned slot", () => {

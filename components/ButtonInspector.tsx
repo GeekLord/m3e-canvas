@@ -297,7 +297,7 @@ export function ButtonInspector({
             <Section id="fab-type" icon="add_circle" title={t("partType", lang)} p={p}>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <FabTypeRow value={item.kind as FabKind} onChange={(k) => onChange(fabTypePatch(item, k))} p={p} />
-                {isExtended && (
+                {isExtended && item.icon && (
                   <Toggle
                     on={!!item.collapseOnScroll}
                     onChange={(collapseOnScroll) => onChange({ collapseOnScroll: collapseOnScroll || undefined })}

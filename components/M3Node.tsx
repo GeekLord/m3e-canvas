@@ -1921,7 +1921,7 @@ export function M3Node({
         outlineOffset: 3,
         /* a part that changes size with its screen, or with the size the author picked,
            eases the way the screen does; a measured part has no width of its own to ease --
-           a label-bearing FAB excepted, which the preview swaps for its standard circle, so
+           a label-bearing FAB excepted, which the preview swaps for an icon-only standard FAB, so
            its width has to travel there and back */
         transition:
           instant || menu.snap

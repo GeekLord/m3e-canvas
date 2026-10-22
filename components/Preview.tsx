@@ -81,8 +81,6 @@ const EASE = [0.2, 0, 0, 1] as const;
 const SLIDE_MS = 0.42;
 /** room reserved for the wide preview controls: panel, right margin and breathing space */
 const WIDE_CONTROL_SPACE = 220;
-/** quiet time after the last scroll event before a folding FAB grows its label back */
-const FAB_SCROLL_IDLE_MS = 180;
 
 type Anim = { t: Transition; back: boolean; /** the expressive motion scheme: springs instead of eased tweens */ spring?: boolean };
 
@@ -768,9 +766,9 @@ function Screen({
 }) {
   /* the dropdown whose menu is open, if any; its group is lifted above the rest */
   const [menuId, setMenuId] = useState<string | null>(null);
-  /* a folding FAB stays compact for the whole gesture, including momentum in either direction */
+  /* a folding FAB folds on the way down and stays folded until the body scrolls back up */
   const [fabFolded, setFabFolded] = useState(false);
-  const fabScrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fabScrollTop = useRef(0);
   const [railStates, setRailStates] = useState<Record<string, boolean>>({});
   const [railMotion, setRailMotion] = useState<(ReturnType<typeof railMotionTargets> & { animate: boolean }) | null>(null);
   const lang = useLang();
@@ -801,18 +799,12 @@ function Screen({
   }
   const lift = (g: Group) => pins.get(g.id) ?? 0;
   const hasFoldingFab = shownGroups.some((g) => g.items.some((it) => it.kind === "extendedFab" && it.collapseOnScroll));
-  const onBodyScroll = () => {
-    if (!hasFoldingFab) return;
-    setFabFolded(true);
-    if (fabScrollIdle.current !== null) clearTimeout(fabScrollIdle.current);
-    fabScrollIdle.current = setTimeout(() => {
-      fabScrollIdle.current = null;
-      setFabFolded(false);
-    }, FAB_SCROLL_IDLE_MS);
+  const onBodyScroll = (e: { currentTarget: { scrollTop: number } }) => {
+    const top = e.currentTarget.scrollTop;
+    const down = top - fabScrollTop.current;
+    fabScrollTop.current = top;
+    if (hasFoldingFab && down !== 0) setFabFolded(down > 0);
   };
-  useEffect(() => () => {
-    if (fabScrollIdle.current !== null) clearTimeout(fabScrollIdle.current);
-  }, []);
   const hasModal = modalIds.size > 0;
   const modalActive = interactive && hasModal;
   const changeRail = (id: string, railExpanded: boolean, animate: boolean) => {
@@ -1014,7 +1006,9 @@ function Screen({
             else if (navKind && it.selected === undefined && values[`${navKey}:opened:${frame.id}`] !== undefined) shown = { ...shown, selected: values[`${navKey}:opened:${frame.id}`] };
             /* a label-bearing FAB folds for motion in either direction and only unfolds after
              * the body settles, whether the FAB rides the body or stands put with a bar */
-            const foldable = scrolls && it.kind === "extendedFab" && !!it.collapseOnScroll;
+            const foldable = scrolls && it.kind === "extendedFab" && !!it.collapseOnScroll && !!it.icon;
+            /* a toggled label or an open menu sizes itself, so only the authored look eases in its slot */
+            const eases = foldable && !flipped.has(it.id);
             const folded = foldable && fabFolded && !fabMenuOpen(shown);
             if (folded) {
               shown = { ...shown, ...fabTypePatch(shown, "fab") };
@@ -1072,12 +1066,12 @@ function Screen({
                 onMenu={it.kind === "select" ? (open) => setMenuId(open ? it.id : null) : undefined}
                 onRailToggle={it.kind === "navRail" && isWideRail(it) ? (animate) => changeRail(it.id, !it.railExpanded, animate) : undefined}
                 panY={scrolls && !pins.has(g.id)}
-                easeWidth={foldable}
+                easeWidth={eases}
               />
             );
             /* Keep the authored width as a right-aligned slot. The visual can then narrow from
              * its left edge while its right edge stays exactly where the author placed it. */
-            const anchored = foldable
+            const anchored = eases
               ? (
                   <div
                     key={it.id}

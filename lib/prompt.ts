@@ -283,11 +283,11 @@ function fabMenuText(it: Item, lang: Lang): string {
 
 /** the optional scroll transform for an extended FAB, including its trailing-edge anchor */
 function fabScrollText(it: Item, lang: Lang): string {
-  if (!it.collapseOnScroll) return "";
-  if (lang === "ja") return "。本文を上下にスクロールしている間はアイコンのみの標準 FAB に右側へ縮まり、右端を固定する。最後のスクロールイベントから 180ms 後に拡張 FAB に戻す";
-  if (lang === "zh") return "。正文向上或向下滚动时，向右收起为仅显示图标的标准 FAB 并保持右边缘固定；最后一次滚动事件后经过 180ms 才恢复为扩展 FAB";
-  if (lang === "ko") return ". 본문을 위나 아래로 스크롤하는 동안 오른쪽으로 아이콘만 표시하는 표준 FAB까지 접고 오른쪽 가장자리를 고정하며, 마지막 스크롤 이벤트로부터 180ms 후에 확장 FAB로 돌아온다";
-  return "; while the body scrolls up or down, collapse toward the right into an icon-only standard FAB while keeping the right edge fixed; expand back to the extended FAB 180 ms after the last scroll event";
+  if (!it.collapseOnScroll || !it.icon) return "";
+  if (lang === "ja") return "。本文を下へスクロールするとアイコンのみの標準 FAB に右側へ縮まり（右端は固定）、スクロールを止めても縮んだまま。上へスクロールすると拡張 FAB に戻る";
+  if (lang === "zh") return "。正文向下滚动时向右收起为仅显示图标的标准 FAB（右边缘固定），停止滚动后仍保持收起；向上滚动时恢复为扩展 FAB";
+  if (lang === "ko") return ". 본문을 아래로 스크롤하면 오른쪽으로 아이콘만 표시하는 표준 FAB까지 접히고(오른쪽 가장자리 고정) 스크롤을 멈춰도 접힌 상태를 유지하며, 위로 스크롤하면 확장 FAB로 돌아온다";
+  return "; when the body scrolls down, it collapses toward the right into an icon-only standard FAB (right edge fixed) and stays collapsed after scrolling stops; scrolling up expands it back to the extended FAB";
 }
 
 /** what a split button's arrow opens, and which way it goes */

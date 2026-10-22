@@ -1674,8 +1674,8 @@ export type Item = {
   bold?: boolean;
   /** height for free-form boxes, and for a button following the M3 size scale */
   size2?: number;
-  /** extended FAB only: in the preview, fold to the standard circle while the body is scrolling
-     and unfold once it settles */
+  /** extended FAB only: in the preview, fold to an icon-only standard FAB when the body scrolls down
+     and unfold when it scrolls back up */
   collapseOnScroll?: boolean;
   /** palette token used as background (boxes, list items) */
   fill?: ColorToken;
