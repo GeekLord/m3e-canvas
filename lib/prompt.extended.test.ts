@@ -18,6 +18,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildPrompt, effectivePrompt } from "./prompt";
+import { Lang } from "./i18n";
 import {
   Doc,
   Frame,
@@ -190,6 +191,30 @@ describe("buildPrompt — items are named in language", () => {
     const doc = baseDoc({ groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [item] }] });
     const out = buildPrompt(doc, widths, undefined, "en");
     expect(out).toContain("with no label");
+  });
+});
+
+describe("extended FAB scroll-collapse prompt", () => {
+  const BEHAVIOR: Record<Lang, string> = {
+    ja: "本文を上下にスクロールしている間はアイコンのみの標準 FAB に右側へ縮まり、右端を固定する。最後のスクロールイベントから 180ms 後に拡張 FAB に戻す",
+    en: "while the body scrolls up or down, collapse toward the right into an icon-only standard FAB while keeping the right edge fixed; expand back to the extended FAB 180 ms after the last scroll event",
+    zh: "正文向上或向下滚动时，向右收起为仅显示图标的标准 FAB 并保持右边缘固定；最后一次滚动事件后经过 180ms 才恢复为扩展 FAB",
+    ko: "본문을 위나 아래로 스크롤하는 동안 오른쪽으로 아이콘만 표시하는 표준 FAB까지 접고 오른쪽 가장자리를 고정하며, 마지막 스크롤 이벤트로부터 180ms 후에 확장 FAB로 돌아온다",
+  };
+
+  it.each(["ja", "en", "zh", "ko"] as Lang[])("describes the enabled scroll transform in %s", (lang) => {
+    const fab: Item = { ...makeItem("extendedFab"), id: "fab", label: "Add", icon: "add", collapseOnScroll: true };
+    expect(buildPrompt(baseDoc({ frames: [{ ...phoneFrame, length: PHONE_H * 2 }], groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).toContain(BEHAVIOR[lang]);
+  });
+
+  it.each(["ja", "en", "zh", "ko"] as Lang[])("does not describe the transform when the screen does not scroll in %s", (lang) => {
+    const fab: Item = { ...makeItem("extendedFab"), id: "fab", label: "Add", icon: "add", collapseOnScroll: true };
+    expect(buildPrompt(baseDoc({ groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).not.toContain(BEHAVIOR[lang]);
+  });
+
+  it.each(["ja", "en", "zh", "ko"] as Lang[])("does not describe the transform when disabled in %s", (lang) => {
+    const fab: Item = { ...makeItem("extendedFab"), id: "fab", label: "Add", icon: "add", collapseOnScroll: false };
+    expect(buildPrompt(baseDoc({ frames: [{ ...phoneFrame, length: PHONE_H * 2 }], groups: [{ id: "g", x: 100, y: 100, axis: "x", items: [fab] }] }), widths, undefined, lang)).not.toContain(BEHAVIOR[lang]);
   });
 });
 
