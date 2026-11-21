@@ -27,6 +27,7 @@ import {
   chipMetrics,
   extendedFabHeight,
   extendedFabMetrics,
+  fabCornerRadius,
   fabOpen,
   isMeasured,
   menuOpen,
@@ -43,6 +44,7 @@ import {
   cardScrimOf,
   cardTextColorOf,
   dateLayoutOf,
+  timeInlineOf,
   onToken,
   scaleR,
   menuRises,
@@ -734,6 +736,10 @@ function FabMenuContent({ item, p, shown = true }: { item: Item; p: Palette; sho
   const extended = item.kind === "extendedFab";
   /* the close button is the M size: a small or a large FAB eases into it rather than jumping */
   const grow = (item.size ?? FAB_MENU_CLOSE) / FAB_MENU_CLOSE;
+  /* the FAB's corners do not grow in step with its size, so the scaled button carries the corner
+     that draws as the FAB's own while shut, and eases to the M size's corner as it opens */
+  const shutCorner = scaleR(fabCornerRadius(item.size ?? FAB_MENU_CLOSE)) / grow;
+  const openCorner = scaleR(fabCornerRadius(FAB_MENU_CLOSE));
   /* opening, the entry nearest the button leads; shutting, the run plays back from the far end */
   const wait = menuEntriesWait(item);
   const after = (i: number) => wait + (tabs.length - 1 - i) * MENU_STAGGER;
@@ -821,7 +827,7 @@ function FabMenuContent({ item, p, shown = true }: { item: Item; p: Palette; sho
         /* scaled rather than resized: the button, its icon and its corners all land on the M size
            together, and the drawing the editor measures never changes width */
         initial={false}
-        animate={extended ? undefined : { scale: open ? 1 : grow }}
+        animate={extended ? undefined : { scale: open ? 1 : grow, borderRadius: open ? openCorner : shutCorner }}
         transition={
           reducedMotion
             ? { duration: 0 }
@@ -840,7 +846,7 @@ function FabMenuContent({ item, p, shown = true }: { item: Item; p: Palette; sho
           fontSize: 16,
           fontWeight: w(500, 700),
           whiteSpace: "nowrap",
-          borderRadius: scaleR(extended ? extendedFabMetrics(extendedFabHeight(item)).radius : Math.round(FAB_MENU_CLOSE * 0.28)),
+          borderRadius: extended ? scaleR(extendedFabMetrics(extendedFabHeight(item)).radius) : undefined,
           display: "grid",
           placeItems: "center",
           boxShadow: "0 3px 8px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.12)",
@@ -1115,9 +1121,10 @@ function Body({ item, p, tabScroll, menuShown }: { item: Item; p: Palette; tabSc
             </div>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            {[t("cancel", lang), t("ok", lang)].map((t) => (
+            {[t("cancel", lang), t("ok", lang)].map((t, i) => (
               <span
                 key={t}
+                data-act={i ? "ok" : "cancel"}
                 style={{
                   padding: "0 12px",
                   height: 40,
@@ -1738,7 +1745,8 @@ export function boxStyle(item: Item, p: Palette): React.CSSProperties {
         ? { background: "transparent", border: "none", color: p.onSurface }
         : { background: p.surfaceContainerHigh, border: "none", color: p.onSurface };
     case "timePicker":
-      return { background: p.surfaceContainerHigh, border: "none", color: p.onSurface };
+      /* an inline picker is part of the page; the others are dialogs over it */
+      return timeInlineOf(item) ? { background: "transparent", border: "none", color: p.onSurface } : { background: p.surfaceContainerHigh, border: "none", color: p.onSurface };
     case "snackbar":
       return { background: p.inverseSurface, border: "none", color: p.inverseOnSurface };
     case "image":
@@ -1771,7 +1779,7 @@ function shadowOf(item: Item): string {
     case "dialog":
       return "0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10)";
     case "timePicker":
-      return "0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10)";
+      return timeInlineOf(item) ? "none" : "0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10)";
     case "datePicker":
       return dateLayoutOf(item) === "input" ? "none" : "0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10)";
     case "snackbar":

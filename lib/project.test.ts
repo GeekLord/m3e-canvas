@@ -157,6 +157,13 @@ describe("projectFileName", () => {
   ])("sanitizes %j to %j", (title, expected) => {
     expect(projectFileName({ ...doc(), title })).toBe(expected);
   });
+
+  it("falls back to the plain name for a legacy document with no title", () => {
+    // isProject accepts minimal legacy files without a title; saving one must not crash on trim.
+    const legacy = { groups: [], frames: [{ id: "f", name: "Home", x: 0, y: 0 }] } as unknown as Doc;
+    expect(isProject(legacy)).toBe(true);
+    expect(projectFileName(legacy)).toBe("m3e-canvas.json");
+  });
 });
 
 describe("readProject", () => {
@@ -198,6 +205,30 @@ describe("readProject", () => {
 
   it.each([null, 0, 1, "true", "false", {}, []])("rejects non-boolean extended FAB scroll-collapse value %j", (collapseOnScroll) => {
     expect(isProject(withItem({ kind: "extendedFab", collapseOnScroll }))).toBe(false);
+  });
+
+  it.each([undefined, false, true])("preserves optional navigation bar scroll hiding %s in project files", async (hideOnScroll) => {
+    const value = withItem({ kind: "bottomNav", hideOnScroll });
+    expect(isProject(value)).toBe(true);
+    await expect(readProject(new File([JSON.stringify(value)], "navigation.json"))).resolves.toEqual(JSON.parse(JSON.stringify(value)));
+  });
+
+  it.each([null, 0, 1, "true", "false", {}, []])("rejects non-boolean navigation bar scroll hiding %j", (hideOnScroll) => {
+    expect(isProject(withItem({ kind: "bottomNav", hideOnScroll }))).toBe(false);
+  });
+
+  it.each([
+    { layout: "scroll", inline: true },
+    { layout: "input", clock24: true },
+    { layout: "dial", horizontal: true, clock24: false },
+  ])("preserves the time picker's options %j in project files", async (options) => {
+    const value = withItem({ kind: "timePicker", ...options });
+    expect(isProject(value)).toBe(true);
+    await expect(readProject(new File([JSON.stringify(value)], "time.json"))).resolves.toEqual(value);
+  });
+
+  it.each(["clock24", "inline", "horizontal"])("rejects a non-boolean time picker %s", (field) => {
+    expect(isProject(withItem({ kind: "timePicker", [field]: "yes" }))).toBe(false);
   });
 
   it.each([undefined, 2, 4, 8, 16])("preserves progress thickness %s in project files", async (trackThickness) => {
